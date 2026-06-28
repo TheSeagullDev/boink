@@ -1,0 +1,1 @@
+<div class="min-h-screen bg-orange-100"></div>
