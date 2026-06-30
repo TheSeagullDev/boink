@@ -1,9 +1,18 @@
-export async function load({ locals: { safeGetSession }, cookies }) {
-	const { session, user } = await safeGetSession();
+export async function load({ locals, cookies }) {
+	const { session, user } = await locals.safeGetSession();
+
+	let profile = null;
+
+	if (user) {
+		const { data } = await locals.supabase.from('profiles').select('*').eq('id', user.id).single();
+
+		profile = data;
+	}
 
 	return {
 		session,
 		user,
+		profile,
 		cookies: cookies.getAll()
 	};
 }

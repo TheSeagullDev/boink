@@ -24,6 +24,7 @@ export async function load({ fetch, data, depends }) {
 			});
 
 	return {
+		...data,
 		supabase
 	};
 }
