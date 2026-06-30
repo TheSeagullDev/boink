@@ -1,7 +1,17 @@
 <script>
 	let { data } = $props();
 
-	let showModal = $state(false);
+	let showBlockModal = $state(false);
+	let showAssignmentModal = $state(false);
+	let selectedBlocks = $state([]);
+
+	function toggleBlock(id) {
+		if (selectedBlocks.includes(id)) {
+			selectedBlocks = selectedBlocks.filter((x) => x !== id);
+		} else {
+			selectedBlocks = [...selectedBlocks, id];
+		}
+	}
 
 	function formatTime(time) {
 		if (!time) return '';
@@ -43,11 +53,17 @@
 
 	<!-- Schedule -->
 	<div class="overflow-hidden rounded-lg border bg-white">
-		<div class="flex items-center justify-between border-b px-5 py-4">
-			<h2 class="text-lg font-semibold">Call Blocks</h2>
-
+		<div class="flex items-center border-b px-5 py-4 gap-2">
+			<h2 class="text-lg font-semibold flex-1">Call Blocks</h2>
 			<button
-				onclick={() => (showModal = true)}
+				disabled={!selectedBlocks.length}
+				onclick={() => (showAssignmentModal = true)}
+				class="rounded-md bg-black px-3 py-2 text-sm text-white disabled:opacity-40"
+			>
+				Assign Selected ({selectedBlocks.length})
+			</button>
+			<button
+				onclick={() => (showBlockModal = true)}
 				class="rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-gray-800"
 			>
 				Add Call Block
@@ -58,18 +74,27 @@
 			<table class="w-full text-sm">
 				<thead class="bg-gray-50 text-left">
 					<tr>
+						<th class="px-4 py-3"></th>
 						<th class="px-4 py-3">Date</th>
 						<th class="px-4 py-3">Call</th>
 						<th class="px-4 py-3">End</th>
 						<th class="px-4 py-3">Location</th>
 						<th class="px-4 py-3">Cast Call</th>
 						<th class="px-4 py-3">Type</th>
+						<th class="px-4 py-3">Assigned To</th>
 					</tr>
 				</thead>
 
 				<tbody class="divide-y">
 					{#each data.position.call_blocks as block}
 						<tr class="hover:bg-gray-50">
+							<td class="px-4 py-3">
+								<input
+									type="checkbox"
+									checked={selectedBlocks.includes(block.id)}
+									onchange={() => toggleBlock(block.id)}
+								/>
+							</td>
 							<td class="px-4 py-3">
 								{block.date}
 							</td>
@@ -93,6 +118,17 @@
 							<td class="px-4 py-3">
 								{block.call_type}
 							</td>
+							<td>
+								{#if block.assignment_blocks?.length}
+									{#each block.assignment_blocks as assignmentBlock}
+										<p>
+											{assignmentBlock.assignments.profiles.name}
+										</p>
+									{/each}
+								{:else}
+									<span class="text-gray-400"> Unassigned </span>
+								{/if}
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -103,13 +139,14 @@
 	</div>
 </div>
 
-{#if showModal}
+{#if showBlockModal}
+	<div class="absolute top-0 left-0 z-49 h-screen w-screen bg-gray-800/30"></div>
 	<div class="fixed top-8 left-1/4 z-50 flex w-1/2 items-center justify-center">
 		<div class="w-full max-w-lg rounded-lg border bg-white p-6">
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-lg font-semibold">Add Call Block</h2>
 
-				<button onclick={() => (showModal = false)} class="text-gray-500 hover:text-black">
+				<button onclick={() => (showBlockModal = false)} class="text-gray-500 hover:text-black">
 					✕
 				</button>
 			</div>
@@ -174,6 +211,50 @@
 					class="w-full rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800"
 				>
 					Create Call Block
+				</button>
+			</form>
+		</div>
+	</div>
+{/if}
+
+{#if showAssignmentModal}
+	<div class="absolute top-0 left-0 z-49 h-screen w-screen bg-gray-800/30"></div>
+	<div class="fixed top-8 left-1/4 z-50 flex w-1/2 items-center justify-center">
+		<div class="w-full max-w-lg rounded-lg border bg-white p-6">
+			<div class="mb-4 flex items-center justify-between">
+				<h2 class="text-lg font-semibold">Assign Crew</h2>
+
+				<button
+					onclick={() => (showAssignmentModal = false)}
+					class="text-gray-500 hover:text-black"
+				>
+					✕
+				</button>
+			</div>
+
+			<form method="POST">
+				<input type="hidden" name="call_blocks" value={JSON.stringify(selectedBlocks)} />
+
+				<select name="worker_id" class="mb-3 w-full rounded border p-2" required>
+					<option value=""> Select worker </option>
+
+					{#each data.workers as worker}
+						<option value={worker.id}>
+							{worker.name}
+						</option>
+					{/each}
+				</select>
+
+				<input name="rate" placeholder="Rate" class="mb-3 w-full rounded border p-2" />
+
+				<textarea name="message" placeholder="Message" class="mb-3 w-full rounded border p-2"
+				></textarea>
+
+				<button
+					formaction="?/createAssignment"
+					class="w-full rounded bg-black px-4 py-2 text-white"
+				>
+					Create Assignment
 				</button>
 			</form>
 		</div>

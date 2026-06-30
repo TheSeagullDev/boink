@@ -1,6 +1,6 @@
 <script>
 	import { supabase } from "$lib/supabaseClient";
-	import { goto } from "$app/navigation";
+	import { goto, invalidateAll } from "$app/navigation";
 	import bg from "$lib/assets/login-bg.png";
 	import logo from "$lib/assets/main-logo-white.png";
 	import { fade } from "svelte/transition";
@@ -22,8 +22,8 @@
 			authError = error.message;
 			return;
 		}
-
-		goto("/dashboard");
+		await invalidateAll()
+		window.location.href = "/dashboard";
 	}
 </script>
 

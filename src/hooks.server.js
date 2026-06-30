@@ -45,6 +45,21 @@ export async function handle({ event, resolve }) {
 		return { session, user };
 	};
 
+	const { user } = await event.locals.safeGetSession();
+
+	event.locals.user = user;
+	event.locals.profile = null;
+
+	if (user) {
+		const { data: profile } = await event.locals.supabase
+			.from('profiles')
+			.select('*')
+			.eq('id', user.id)
+			.single();
+
+		event.locals.profile = profile;
+	}
+
 	return resolve(event, {
 		filterSerializedResponseHeaders(name) {
 			return name === 'content-range' || name === 'x-supabase-api-version';
