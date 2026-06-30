@@ -5,28 +5,18 @@
 	import logo from "$lib/assets/main-logo-white.png";
 	import { fade } from "svelte/transition";
 
-	let { data } = $props();
+	let email = $state("");
+	let password = $state("");
+	let authError = $state("");
 
-	let email = $state();
-	let password = $state();
-	let authError = $state();
-
-	let loginActive = $state(true);
-	let signupActive = $derived(!loginActive);
-
-	async function authenticate(event) {
+	async function login(event) {
 		event.preventDefault();
 		authError = "";
 
-		const { error } = loginActive
-			? await supabase.auth.signInWithPassword({
-					email,
-					password
-				})
-			: await supabase.auth.signUp({
-					email,
-					password
-				});
+		const { error } = await supabase.auth.signInWithPassword({
+			email,
+			password
+		});
 
 		if (error) {
 			authError = error.message;
@@ -34,13 +24,6 @@
 		}
 
 		goto("/dashboard");
-	}
-
-	function toggleLoginSignup() {
-		loginActive = !loginActive;
-		email = "";
-		password = "";
-		authError = "";
 	}
 </script>
 
@@ -51,11 +34,10 @@
 	<div
 		class="m-4 flex flex-col items-center justify-center rounded-2xl bg-gray-800/20 p-4 shadow-xl sm:w-1/2"
 	>
-		<img src={logo} class="w-1/2" alt="background" />
+		<img src={logo} class="w-1/2" alt="Logo" />
+
 		<h1 class="my-4 text-5xl tracking-widest font-stretch-200%">BOINK</h1>
-		<h2 class="text-3xl font-stretch-150%">
-			{loginActive ? "Login" : "Sign Up"}
-		</h2>
+		<h2 class="text-3xl font-stretch-150%">Login</h2>
 
 		{#if authError}
 			<h2 class="text-red-300" transition:fade>
@@ -63,13 +45,14 @@
 			</h2>
 		{/if}
 
-		<form onsubmit={authenticate} class="my-4 flex min-w-1/2 flex-col">
+		<form onsubmit={login} class="my-4 flex min-w-1/2 flex-col">
 			<label for="email">Email:</label>
 			<input
 				type="email"
 				id="email"
 				bind:value={email}
 				class="my-2 rounded-2xl border-0 bg-gray-800/30 p-2 transition focus:scale-105 focus:ring-0 focus:outline-none"
+				required
 			/>
 
 			<label for="password">Password:</label>
@@ -78,24 +61,14 @@
 				id="password"
 				bind:value={password}
 				class="my-2 rounded-2xl border-0 bg-gray-800/30 p-2 transition focus:scale-105 focus:ring-0 focus:outline-none"
+				required
 			/>
 
 			<input
 				type="submit"
-				value={loginActive ? "Login" : "Sign Up"}
-				class="my-2 rounded-2xl bg-gray-800/40 p-2 shadow-sm transition hover:bg-gray-800/60"
+				value="Login"
+				class="my-2 cursor-pointer rounded-2xl bg-gray-800/40 p-2 shadow-sm transition hover:bg-gray-800/60"
 			/>
 		</form>
-		<h3>
-			{#if loginActive}
-				Don"t have an account?
-			{:else}
-				Already have an account?
-			{/if}
-
-			<button class="cursor-pointer text-blue-500" onclick={toggleLoginSignup}>
-				{loginActive ? "Create one." : "Login."}
-			</button>
-		</h3>
 	</div>
 </div>

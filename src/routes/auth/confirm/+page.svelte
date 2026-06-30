@@ -1,5 +1,6 @@
 <script>
 	import { goto } from '$app/navigation';
+    import background from "$lib/assets/login-bg.png";
 
 	let { data } = $props();
 
@@ -87,7 +88,7 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+<div class="min-h-screen flex items-center justify-center p-4 bg-cover" style={`background-image: url(${background})`}>
 	<div class="w-full max-w-md">
 		<div class="bg-white rounded-lg shadow-xl p-8">
 			<h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome!</h1>
@@ -126,7 +127,7 @@
 									class="absolute right-3 top-2.5 text-gray-500 text-sm"
 									disabled={isLoading}
 								>
-									{showPassword ? '🙈 Hide' : '👁️ Show'}
+									{showPassword ? 'Hide' : 'Show'}
 								</button>
 							</div>
 							{#if password && password.length < 8}
