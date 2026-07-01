@@ -101,42 +101,108 @@ export const actions = {
 		const worker_id = form.get('worker_id');
 		const rate = form.get('rate');
 		const message = form.get('message');
-
 		const call_blocks = JSON.parse(form.get('call_blocks'));
 
-		// create assignment
-
-		const { data: assignment, error } = await locals.supabase
+		// Find or create the assignment for this worker + position
+		const { data: existingAssignment, error: lookupError } = await locals.supabase
 			.from('assignments')
-			.insert({
-				worker_id,
-				position_id: params.positionId,
-				status: 'sent',
-				rate,
-				message
-			})
-			.select()
-			.single();
+			.select('id')
+			.eq('worker_id', worker_id)
+			.eq('position_id', params.positionId)
+			.maybeSingle();
 
-		if (error) {
-			return {
-				error: error.message
-			};
+		if (lookupError) {
+			return fail(500, { error: lookupError.message });
 		}
 
-		// link blocks
+		let assignmentId;
 
-		const rows = call_blocks.map((id) => ({
-			assignment_id: assignment.id,
-			call_block_id: id
-		}));
+		if (existingAssignment) {
+			assignmentId = existingAssignment.id;
+		} else {
+			const { data: newAssignment, error: createError } = await locals.supabase
+				.from('assignments')
+				.insert({
+					worker_id,
+					position_id: params.positionId,
+					status: 'sent',
+					rate,
+					message
+				})
+				.select('id')
+				.single();
 
-		const { error: blockError } = await locals.supabase.from('assignment_blocks').insert(rows);
+			if (createError) {
+				return fail(400, { error: createError.message });
+			}
 
-		if (blockError) {
-			return {
-				error: blockError.message
-			};
+			assignmentId = newAssignment.id;
+		}
+
+		// Find every assignment for this position
+		const { data: positionAssignments, error: positionError } = await locals.supabase
+			.from('assignments')
+			.select('id')
+			.eq('position_id', params.positionId);
+
+		if (positionError) {
+			return fail(500, { error: positionError.message });
+		}
+
+		const assignmentIds = positionAssignments.map((a) => a.id);
+
+		// Remove these call blocks from EVERY assignment in this position
+		if (assignmentIds.length) {
+			const { error: deleteError } = await locals.supabase
+				.from('assignment_blocks')
+				.delete()
+				.in('assignment_id', assignmentIds)
+				.in('call_block_id', call_blocks);
+
+			if (deleteError) {
+				return fail(500, { error: deleteError.message });
+			}
+		}
+
+		// Find which blocks this assignment already has
+		const { data: existingBlocks, error: existingBlocksError } = await locals.supabase
+			.from('assignment_blocks')
+			.select('call_block_id')
+			.eq('assignment_id', assignmentId);
+
+		if (existingBlocksError) {
+			return fail(500, { error: existingBlocksError.message });
+		}
+
+		const existingIds = new Set(existingBlocks.map((b) => b.call_block_id));
+
+		const rows = call_blocks
+			.filter((id) => !existingIds.has(id))
+			.map((id) => ({
+				assignment_id: assignmentId,
+				call_block_id: id
+			}));
+
+		if (rows.length) {
+			const { error: insertError } = await locals.supabase.from('assignment_blocks').insert(rows);
+
+			if (insertError) {
+				return fail(400, { error: insertError.message });
+			}
+		}
+
+		// Delete assignments that no longer have any call blocks
+		for (const assignment of positionAssignments) {
+			if (assignment.id === assignmentId) continue;
+
+			const { count } = await locals.supabase
+				.from('assignment_blocks')
+				.select('*', { count: 'exact', head: true })
+				.eq('assignment_id', assignment.id);
+
+			if (count === 0) {
+				await locals.supabase.from('assignments').delete().eq('id', assignment.id);
+			}
 		}
 
 		return {

@@ -21,3 +21,29 @@ export async function load({ params, locals }) {
 		job
 	};
 }
+
+export const actions = {
+	createPosition: async ({ request, params, locals }) => {
+		const form = await request.formData();
+
+		const position = {
+			job_id: form.get('job_id'),
+			title: form.get('title'),
+			department: form.get('department'),
+			status: form.get('status'),
+			notes: form.get('notes')
+		};
+
+		const { error } = await locals.supabase.from('positions').insert(position);
+
+		if (error) {
+			return fail(400, {
+				error: error.message
+			});
+		}
+
+		return {
+			success: true
+		};
+	}
+};
