@@ -1,5 +1,13 @@
-import { error } from '@sveltejs/kit';
-import { fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
+
+function canManage(locals) {
+	return locals.profile && ['admin', 'manager'].includes(locals.profile.role);
+}
+
+function formValue(form, name) {
+	const value = form.get(name);
+	return value === '' || value === null ? null : value;
+}
 
 export async function load({ params, locals }) {
 	const { data: position, dbError } = await locals.supabase
@@ -53,11 +61,9 @@ export async function load({ params, locals }) {
 
 export const actions = {
 	createCallBlock: async ({ request, params, locals }) => {
-		const { user } = await locals.safeGetSession();
-
-		if (!user) {
-			return fail(401, {
-				error: 'Unauthorized'
+		if (!canManage(locals)) {
+			return fail(403, {
+				error: 'Forbidden'
 			});
 		}
 
@@ -66,18 +72,18 @@ export const actions = {
 		const callBlock = {
 			position_id: params.positionId,
 
-			date: form.get('date'),
-			start_time: form.get('start_time'),
-			end_time: form.get('end_time') || null,
+			date: formValue(form, 'date'),
+			start_time: formValue(form, 'start_time'),
+			end_time: formValue(form, 'end_time'),
 
-			location: form.get('location'),
-			call_type: form.get('call_type'),
+			location: formValue(form, 'location'),
+			call_type: formValue(form, 'call_type'),
 
-			cast_call_time: form.get('cast_call_time') || null,
+			cast_call_time: formValue(form, 'cast_call_time'),
 
-			break_notes: form.get('break_notes'),
-			public_notes: form.get('public_notes'),
-			internal_notes: form.get('internal_notes')
+			break_notes: formValue(form, 'break_notes'),
+			public_notes: formValue(form, 'public_notes'),
+			internal_notes: formValue(form, 'internal_notes')
 		};
 
 		const { error } = await locals.supabase.from('call_blocks').insert(callBlock);
@@ -95,13 +101,123 @@ export const actions = {
 		};
 	},
 
+	updateCallBlock: async ({ request, locals }) => {
+		if (!canManage(locals)) {
+			return fail(403, {
+				error: 'Forbidden'
+			});
+		}
+
+		const form = await request.formData();
+		const callBlockId = formValue(form, 'call_block_id');
+
+		if (!callBlockId) {
+			return fail(400, { error: 'Call block id is required' });
+		}
+
+		const callBlock = {
+			date: formValue(form, 'date'),
+			start_time: formValue(form, 'start_time'),
+			end_time: formValue(form, 'end_time'),
+			location: formValue(form, 'location'),
+			call_type: formValue(form, 'call_type'),
+			cast_call_time: formValue(form, 'cast_call_time'),
+			break_notes: formValue(form, 'break_notes'),
+			public_notes: formValue(form, 'public_notes'),
+			internal_notes: formValue(form, 'internal_notes')
+		};
+
+		const { error } = await locals.supabase.from('call_blocks').update(callBlock).eq('id', callBlockId);
+
+		if (error) {
+			return fail(400, { error: error.message });
+		}
+
+		return {
+			success: true
+		};
+	},
+
+	deleteCallBlock: async ({ request, locals }) => {
+		if (!canManage(locals)) {
+			return fail(403, {
+				error: 'Forbidden'
+			});
+		}
+
+		const form = await request.formData();
+		const callBlockId = formValue(form, 'call_block_id');
+
+		if (!callBlockId) {
+			return fail(400, { error: 'Call block id is required' });
+		}
+
+		const { error } = await locals.supabase.from('call_blocks').delete().eq('id', callBlockId);
+
+		if (error) {
+			return fail(400, { error: error.message });
+		}
+
+		return {
+			success: true
+		};
+	},
+
+	deletePosition: async ({ request, locals, params }) => {
+		if (!canManage(locals)) {
+			return fail(403, {
+				error: 'Forbidden'
+			});
+		}
+
+		const form = await request.formData();
+		const positionId = formValue(form, 'position_id');
+
+		if (!positionId) {
+			return fail(400, { error: 'Position id is required' });
+		}
+
+		const { error } = await locals.supabase.from('positions').delete().eq('id', positionId);
+
+		if (error) {
+			return fail(400, { error: error.message });
+		}
+
+		throw redirect(303, `/dashboard/jobs/view/${params.jobnumber}`);
+	},
+
 	createAssignment: async ({ request, locals, params }) => {
+		if (!canManage(locals)) {
+			return fail(403, {
+				error: 'Forbidden'
+			});
+		}
+
 		const form = await request.formData();
 
 		const worker_id = form.get('worker_id');
 		const rate = form.get('rate');
 		const message = form.get('message');
-		const call_blocks = JSON.parse(form.get('call_blocks'));
+		const callBlocksValue = form.get('call_blocks');
+		const call_blocks = callBlocksValue ? JSON.parse(callBlocksValue) : [];
+
+		if (!worker_id) {
+			return fail(400, { error: 'Worker is required' });
+		}
+
+		if (!rate || rate === '') {
+			return fail(400, { error: 'Rate is required' });
+		}
+
+		const numericRate = Number(rate);
+
+		if (!Number.isFinite(numericRate)) {
+			return fail(400, { error: 'Rate must be a valid number' });
+		}
+
+		if (!call_blocks.length) {
+			return fail(400, { error: 'Select at least one call block' });
+		}
 
 		// Find or create the assignment for this worker + position
 		const { data: existingAssignment, error: lookupError } = await locals.supabase
@@ -126,7 +242,7 @@ export const actions = {
 					worker_id,
 					position_id: params.positionId,
 					status: 'sent',
-					rate,
+					rate: numericRate,
 					message
 				})
 				.select('id')

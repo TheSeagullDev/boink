@@ -1,9 +1,32 @@
 <script>
+	import { enhance } from '$app/forms';
+
 	let { data } = $props();
 
+	let showPositionModal = $state(false);
 	let showBlockModal = $state(false);
 	let showAssignmentModal = $state(false);
+
+	let editingCallBlock = $state(null);
+	let callBlockId = $state('');
+	let callBlockDate = $state('');
+	let callBlockStartTime = $state('');
+	let callBlockEndTime = $state('');
+	let callBlockLocation = $state('');
+	let callBlockType = $state('');
+	let callBlockCastCallTime = $state('');
+	let callBlockBreakNotes = $state('');
+	let callBlockPublicNotes = $state('');
+	let callBlockInternalNotes = $state('');
+
+	let positionTitle = $state('');
+	let positionDepartment = $state('');
+	let positionStatus = $state('open');
+	let positionNotes = $state('');
+
 	let selectedBlocks = $state([]);
+	let assignmentError = $state('');
+	let isAssigning = $state(false);
 
 	function toggleBlock(id) {
 		if (selectedBlocks.includes(id)) {
@@ -21,49 +44,112 @@
 			minute: '2-digit'
 		});
 	}
+
+	function openPositionModal() {
+		positionTitle = data.position.title ?? '';
+		positionDepartment = data.position.department ?? '';
+		positionStatus = data.position.status ?? 'open';
+		positionNotes = data.position.notes ?? '';
+		showPositionModal = true;
+	}
+
+	function openCallBlockModal(block = null) {
+		editingCallBlock = block;
+		callBlockId = block?.id ?? '';
+		callBlockDate = block?.date ?? '';
+		callBlockStartTime = block?.start_time ?? '';
+		callBlockEndTime = block?.end_time ?? '';
+		callBlockLocation = block?.location ?? '';
+		callBlockType = block?.call_type ?? '';
+		callBlockCastCallTime = block?.cast_call_time ?? '';
+		callBlockBreakNotes = block?.break_notes ?? '';
+		callBlockPublicNotes = block?.public_notes ?? '';
+		callBlockInternalNotes = block?.internal_notes ?? '';
+		showBlockModal = true;
+	}
+
+	function closePositionModal() {
+		showPositionModal = false;
+	}
+
+	function closeCallBlockModal() {
+		showBlockModal = false;
+		editingCallBlock = null;
+	}
+
+	function openAssignmentModal() {
+		assignmentError = '';
+		showAssignmentModal = true;
+	}
 </script>
 
 <div class="space-y-6 p-6">
 	<!-- Header -->
 	<div class="rounded-lg border bg-white p-5">
-		<p class="text-sm text-gray-500">
-			Job #{data.position.jobs.job_number}
-		</p>
+		<div class="flex items-start justify-between gap-4">
+			<div>
+				<p class="text-sm text-gray-500">Job #{data.position.jobs.job_number}</p>
 
-		<h1 class="text-2xl font-semibold">
-			{data.position.title}
-		</h1>
+				<h1 class="text-2xl font-semibold">{data.position.title}</h1>
 
-		<p class="mt-1 text-gray-600">
-			{data.position.jobs.name}
-		</p>
+				<p class="mt-1 text-gray-600">{data.position.jobs.name}</p>
 
-		<div class="mt-3 text-sm">
-			<span class="font-medium"> Department: </span>
+				<div class="mt-3 text-sm">
+					<span class="font-medium">Department:</span>
+					{data.position.department}
+				</div>
 
-			{data.position.department}
+				{#if data.position.notes}
+					<p class="mt-3 text-sm text-gray-600">{data.position.notes}</p>
+				{/if}
+			</div>
+
+			<div class="flex shrink-0 gap-2">
+				<button
+					type="button"
+					class="rounded-md border px-3 py-2 text-sm transition hover:bg-gray-50"
+					onclick={() => openPositionModal()}
+				>
+					Edit Position
+				</button>
+
+				<form method="POST">
+					<input type="hidden" name="position_id" value={data.position.id} />
+					<button
+						formaction="?/deletePosition"
+						class="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700 transition hover:bg-red-50"
+						onclick={(event) => {
+							if (
+								!confirm(
+									`Delete position "${data.position.title}"? This will remove its call blocks, assignments, and related postings.`
+								)
+							) {
+								event.preventDefault();
+							}
+						}}
+					>
+						Delete Position
+					</button>
+				</form>
+			</div>
 		</div>
-
-		{#if data.position.notes}
-			<p class="mt-3 text-sm text-gray-600">
-				{data.position.notes}
-			</p>
-		{/if}
 	</div>
 
 	<!-- Schedule -->
 	<div class="overflow-hidden rounded-lg border bg-white">
-		<div class="flex items-center border-b px-5 py-4 gap-2">
-			<h2 class="text-lg font-semibold flex-1">Call Blocks</h2>
+		<div class="flex items-center gap-2 border-b px-5 py-4">
+			<h2 class="flex-1 text-lg font-semibold">Call Blocks</h2>
+
 			<button
 				disabled={!selectedBlocks.length}
-				onclick={() => (showAssignmentModal = true)}
+				onclick={openAssignmentModal}
 				class="rounded-md bg-black px-3 py-2 text-sm text-white disabled:opacity-40"
 			>
 				Assign Selected ({selectedBlocks.length})
 			</button>
+
 			<button
-				onclick={() => (showBlockModal = true)}
+				onclick={() => openCallBlockModal()}
 				class="rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-gray-800"
 			>
 				Add Call Block
@@ -82,6 +168,7 @@
 						<th class="px-4 py-3">Cast Call</th>
 						<th class="px-4 py-3">Type</th>
 						<th class="px-4 py-3">Assigned To</th>
+						<th class="px-4 py-3 text-right">Actions</th>
 					</tr>
 				</thead>
 
@@ -95,39 +182,50 @@
 									onchange={() => toggleBlock(block.id)}
 								/>
 							</td>
+							<td class="px-4 py-3">{block.date}</td>
+							<td class="px-4 py-3">{formatTime(block.start_time)}</td>
+							<td class="px-4 py-3">{formatTime(block.end_time)}</td>
+							<td class="px-4 py-3">{block.location}</td>
+							<td class="px-4 py-3">{formatTime(block.cast_call_time)}</td>
+							<td class="px-4 py-3">{block.call_type}</td>
 							<td class="px-4 py-3">
-								{block.date}
-							</td>
-
-							<td class="px-4 py-3">
-								{formatTime(block.start_time)}
-							</td>
-
-							<td class="px-4 py-3">
-								{formatTime(block.end_time)}
-							</td>
-
-							<td class="px-4 py-3">
-								{block.location}
-							</td>
-
-							<td class="px-4 py-3">
-								{formatTime(block.cast_call_time)}
-							</td>
-
-							<td class="px-4 py-3">
-								{block.call_type}
-							</td>
-							<td>
 								{#if block.assignment_blocks?.length}
 									{#each block.assignment_blocks as assignmentBlock}
-										<p>
-											{assignmentBlock.assignments.profiles.name}
-										</p>
+										<p>{assignmentBlock.assignments.profiles.name}</p>
 									{/each}
 								{:else}
-									<span class="text-gray-400"> Unassigned </span>
+									<span class="text-gray-400">Unassigned</span>
 								{/if}
+							</td>
+							<td class="px-4 py-3">
+								<div class="flex justify-end gap-2">
+									<button
+										type="button"
+										class="rounded-md border px-3 py-2 text-xs font-medium transition hover:bg-gray-100"
+										onclick={() => openCallBlockModal(block)}
+									>
+										Edit
+									</button>
+
+									<form method="POST">
+										<input type="hidden" name="call_block_id" value={block.id} />
+										<button
+											formaction="?/deleteCallBlock"
+											class="rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-50"
+											onclick={(event) => {
+												if (
+													!confirm(
+														'Delete this call block? This will remove assignment links and any related timesheet entries.'
+													)
+												) {
+													event.preventDefault();
+												}
+											}}
+										>
+											Delete
+										</button>
+									</form>
+								</div>
 							</td>
 						</tr>
 					{/each}
@@ -139,20 +237,79 @@
 	</div>
 </div>
 
-{#if showBlockModal}
-	<div class="absolute top-0 left-0 z-49 h-screen w-screen bg-gray-800/30"></div>
-	<div class="fixed top-8 left-1/4 z-50 flex w-1/2 items-center justify-center">
-		<div class="w-full max-w-lg rounded-lg border bg-white p-6">
+{#if showPositionModal}
+	<div class="fixed inset-0 z-40 bg-gray-800/30"></div>
+	<div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6">
+		<div class="mt-8 w-full max-w-lg rounded-lg border bg-white p-6 shadow-xl">
 			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-lg font-semibold">Add Call Block</h2>
+				<h2 class="text-lg font-semibold">Edit Position</h2>
 
-				<button onclick={() => (showBlockModal = false)} class="text-gray-500 hover:text-black">
-					✕
-				</button>
+				<button onclick={closePositionModal} class="text-gray-500 hover:text-black">✕</button>
 			</div>
 
 			<form method="POST" class="space-y-3">
-				<input type="date" name="date" required class="w-full rounded-md border px-3 py-2" />
+				<input type="hidden" name="position_id" value={data.position.id} />
+
+				<input
+					name="title"
+					required
+					placeholder="Position Title"
+					class="w-full rounded-md border px-3 py-2"
+					bind:value={positionTitle}
+				/>
+
+				<input
+					name="department"
+					placeholder="Department"
+					class="w-full rounded-md border px-3 py-2"
+					bind:value={positionDepartment}
+				/>
+
+				<select name="status" class="w-full rounded-md border px-3 py-2" bind:value={positionStatus}>
+					<option value="open">Open</option>
+					<option value="filled">Filled</option>
+					<option value="cancelled">Cancelled</option>
+				</select>
+
+				<textarea
+					name="notes"
+					placeholder="Notes"
+					class="w-full rounded-md border px-3 py-2"
+					bind:value={positionNotes}
+				></textarea>
+
+				<button
+					formaction="?/updatePosition"
+					class="w-full rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800"
+				>
+					Save Changes
+				</button>
+			</form>
+		</div>
+	</div>
+{/if}
+
+{#if showBlockModal}
+	<div class="fixed inset-0 z-40 bg-gray-800/30"></div>
+	<div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6">
+		<div class="mt-8 w-full max-w-lg rounded-lg border bg-white p-6 shadow-xl">
+			<div class="mb-4 flex items-center justify-between">
+				<h2 class="text-lg font-semibold">{editingCallBlock ? 'Edit Call Block' : 'Add Call Block'}</h2>
+
+				<button onclick={closeCallBlockModal} class="text-gray-500 hover:text-black">✕</button>
+			</div>
+
+			<form method="POST" class="space-y-3">
+				<input type="hidden" name="position_id" value={data.position.id} />
+				<input type="hidden" name="call_block_id" value={callBlockId} />
+
+				<input
+					type="date"
+					name="date"
+					required
+					class="w-full rounded-md border px-3 py-2"
+					bind:value={callBlockDate}
+				/>
 
 				<div class="grid grid-cols-2 gap-3">
 					<label class="text-sm">
@@ -162,12 +319,18 @@
 							name="start_time"
 							required
 							class="mt-1 w-full rounded-md border px-3 py-2"
+							bind:value={callBlockStartTime}
 						/>
 					</label>
 
 					<label class="text-sm">
 						End Time
-						<input type="time" name="end_time" class="mt-1 w-full rounded-md border px-3 py-2" />
+						<input
+							type="time"
+							name="end_time"
+							class="mt-1 w-full rounded-md border px-3 py-2"
+							bind:value={callBlockEndTime}
+						/>
 					</label>
 				</div>
 
@@ -177,40 +340,50 @@
 						type="time"
 						name="cast_call_time"
 						class="mt-1 w-full rounded-md border px-3 py-2"
+						bind:value={callBlockCastCallTime}
 					/>
 				</label>
 
-				<input name="location" placeholder="Location" class="w-full rounded-md border px-3 py-2" />
+				<input
+					name="location"
+					placeholder="Location"
+					class="w-full rounded-md border px-3 py-2"
+					bind:value={callBlockLocation}
+				/>
 
 				<input
 					name="call_type"
 					placeholder="Call Type (Load In, Show, Strike...)"
 					class="w-full rounded-md border px-3 py-2"
+					bind:value={callBlockType}
 				/>
 
 				<textarea
 					name="break_notes"
 					placeholder="Break Notes"
 					class="w-full rounded-md border px-3 py-2"
+					bind:value={callBlockBreakNotes}
 				></textarea>
 
 				<textarea
 					name="public_notes"
 					placeholder="Public Notes"
 					class="w-full rounded-md border px-3 py-2"
+					bind:value={callBlockPublicNotes}
 				></textarea>
 
 				<textarea
 					name="internal_notes"
 					placeholder="Internal Notes"
 					class="w-full rounded-md border px-3 py-2"
+					bind:value={callBlockInternalNotes}
 				></textarea>
 
 				<button
-					formaction="?/createCallBlock"
+					formaction={editingCallBlock ? '?/updateCallBlock' : '?/createCallBlock'}
 					class="w-full rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800"
 				>
-					Create Call Block
+					{editingCallBlock ? 'Save Changes' : 'Create Call Block'}
 				</button>
 			</form>
 		</div>
@@ -218,9 +391,9 @@
 {/if}
 
 {#if showAssignmentModal}
-	<div class="absolute top-0 left-0 z-49 h-screen w-screen bg-gray-800/30"></div>
-	<div class="fixed top-8 left-1/4 z-50 flex w-1/2 items-center justify-center">
-		<div class="w-full max-w-lg rounded-lg border bg-white p-6">
+	<div class="fixed inset-0 z-40 bg-gray-800/30"></div>
+	<div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6">
+		<div class="mt-8 w-full max-w-lg rounded-lg border bg-white p-6 shadow-xl">
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-lg font-semibold">Assign Crew</h2>
 
@@ -232,29 +405,58 @@
 				</button>
 			</div>
 
-			<form method="POST">
+			<form
+				method="POST"
+				use:enhance={() => {
+					isAssigning = true;
+					assignmentError = '';
+
+					return async ({ result, update }) => {
+						isAssigning = false;
+
+						if (result.type === 'failure') {
+							assignmentError = result.data?.error ?? 'Failed to create assignment';
+							return;
+						}
+
+						selectedBlocks = [];
+						showAssignmentModal = false;
+						await update();
+					};
+				}}
+			>
 				<input type="hidden" name="call_blocks" value={JSON.stringify(selectedBlocks)} />
 
 				<select name="worker_id" class="mb-3 w-full rounded border p-2" required>
-					<option value=""> Select worker </option>
+					<option value="">Select worker</option>
 
 					{#each data.workers as worker}
-						<option value={worker.id}>
-							{worker.name}
-						</option>
+						<option value={worker.id}>{worker.name}</option>
 					{/each}
 				</select>
 
-				<input name="rate" placeholder="Rate" class="mb-3 w-full rounded border p-2" />
+				<input
+					name="rate"
+					type="number"
+					step="0.01"
+					placeholder="Rate"
+					class="mb-3 w-full rounded border p-2"
+					required
+				/>
 
 				<textarea name="message" placeholder="Message" class="mb-3 w-full rounded border p-2"
 				></textarea>
 
+				{#if assignmentError}
+					<p class="mb-3 text-sm text-red-600">{assignmentError}</p>
+				{/if}
+
 				<button
 					formaction="?/createAssignment"
-					class="w-full rounded bg-black px-4 py-2 text-white"
+					class="w-full rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+					disabled={isAssigning}
 				>
-					Create Assignment
+					{isAssigning ? 'Creating...' : 'Create Assignment'}
 				</button>
 			</form>
 		</div>
