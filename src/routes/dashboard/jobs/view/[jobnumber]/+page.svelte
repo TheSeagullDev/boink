@@ -1,5 +1,6 @@
 <script>
 	let { data } = $props();
+	import { formatDate } from '$lib/utils/format.js';
 
 	let showPositionModal = $state(false);
 	let editingPosition = $state(null);
@@ -39,7 +40,10 @@
 				<div class="text-right">
 					<p><span class="font-medium">Client:</span> {data.job.client}</p>
 					<p><span class="font-medium">Location:</span> {data.job.location}</p>
-					<p><span class="font-medium">Dates:</span> {data.job.start_date} - {data.job.end_date}</p>
+					<p>
+						<span class="font-medium">Dates:</span>
+						{formatDate(data.job.start_date)} - {formatDate(data.job.end_date)}
+					</p>
 				</div>
 			</div>
 		</div>
@@ -47,6 +51,14 @@
 		{#if data.job.notes}
 			<div class="mt-4 border-t pt-4 text-sm text-gray-600">{data.job.notes}</div>
 		{/if}
+		<div class="mt-4">
+            <a
+                href="/dashboard/jobs/view/{data.job.job_number}/summary"
+                class="rounded-md border px-3 py-2 text-sm transition hover:bg-gray-50"
+            >
+                Schedule View
+            </a>
+        </div>
 	</div>
 
 	<!-- Positions -->
@@ -154,7 +166,11 @@
 					bind:value={positionDepartment}
 				/>
 
-				<select name="status" class="w-full rounded-md border px-3 py-2" bind:value={positionStatus}>
+				<select
+					name="status"
+					class="w-full rounded-md border px-3 py-2"
+					bind:value={positionStatus}
+				>
 					<option value="open">Open</option>
 					<option value="filled">Filled</option>
 					<option value="cancelled">Cancelled</option>

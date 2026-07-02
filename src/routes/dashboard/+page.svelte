@@ -1,14 +1,6 @@
 <script>
 	let { data } = $props();
-
-	function formatTime(time) {
-		if (!time) return '';
-
-		return new Date(`1970-01-01T${time}`).toLocaleTimeString([], {
-			hour: 'numeric',
-			minute: '2-digit'
-		});
-	}
+    import {formatDate, formatTime } from "$lib/utils/format.js";
 </script>
 
     <h1 class="p-4 text-2xl font-semibold">My Assignments</h1>
@@ -39,7 +31,7 @@
                         {#each assignment.assignment_blocks as block}
                             <div class="rounded bg-gray-50 p-3">
                                 <p>
-                                    {block.call_blocks.date}
+                                    {formatDate(block.call_blocks.date)}
                                 </p>
     
                                 <p>

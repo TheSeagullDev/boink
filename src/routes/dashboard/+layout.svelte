@@ -26,7 +26,7 @@
 	});
 </script>
 
-<header class="flex w-full gap-4 bg-orange-500 px-6 py-4 text-white">
+<header class="flex w-full gap-4 bg-orange-500 px-6 py-4 text-white print:hidden">
 	<a href="/dashboard" class="flex flex-1 gap-4 text-2xl tracking-widest font-stretch-200%"
 		><img src={logo} alt="" class="h-8" />BOINK</a
 	>
@@ -39,7 +39,7 @@
 			onclick={async () => {
 				await data.supabase.auth.signOut();
 				await invalidateAll();
-				window.location.href = "/";
+				window.location.href = '/';
 			}}>Sign Out</button
 		>
 	</div>

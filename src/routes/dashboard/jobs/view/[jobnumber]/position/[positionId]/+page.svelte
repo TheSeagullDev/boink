@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+    import { formatDate, formatTime } from "$lib/utils/format.js";
 
 	let { data } = $props();
 
@@ -34,15 +35,6 @@
 		} else {
 			selectedBlocks = [...selectedBlocks, id];
 		}
-	}
-
-	function formatTime(time) {
-		if (!time) return '';
-
-		return new Date(`1970-01-01T${time}`).toLocaleTimeString([], {
-			hour: 'numeric',
-			minute: '2-digit'
-		});
 	}
 
 	function openPositionModal() {
@@ -182,7 +174,7 @@
 									onchange={() => toggleBlock(block.id)}
 								/>
 							</td>
-							<td class="px-4 py-3">{block.date}</td>
+							<td class="px-4 py-3">{formatDate(block.date)}</td>
 							<td class="px-4 py-3">{formatTime(block.start_time)}</td>
 							<td class="px-4 py-3">{formatTime(block.end_time)}</td>
 							<td class="px-4 py-3">{block.location}</td>

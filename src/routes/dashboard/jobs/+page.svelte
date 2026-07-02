@@ -1,5 +1,6 @@
 <script>
 	let { data, form } = $props();
+    import { formatDate } from "$lib/utils/format.js";
 
 	let showJobModal = $state(false);
 	let editingJob = $state(null);
@@ -69,8 +70,8 @@
 								<td class="px-4 py-3">{job.name}</td>
 								<td class="px-4 py-3">{job.client}</td>
 								<td class="px-4 py-3">{job.location}</td>
-								<td class="px-4 py-3">{job.start_date}</td>
-								<td class="px-4 py-3">{job.end_date}</td>
+								<td class="px-4 py-3">{formatDate(job.start_date)}</td>
+								<td class="px-4 py-3">{formatDate(job.end_date)}</td>
 								<td class="max-w-xs px-4 py-3 truncate">{job.notes}</td>
 								<td class="px-4 py-3">
 									<div class="flex justify-end gap-2">
